@@ -5,10 +5,9 @@ set -e
 # Uso: ./install.sh
 
 SERVICE_NAME="whisper-api"
-SERVICE_USER="hal5000"
+SERVICE_USER="${SUDO_USER:-$USER}"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="/opt/whisper-api"
-CONDA_ENV="/home/hal5000/.conda/envs/whisper-api"
 PORT=8787
 QBERT_SUDOERS="/etc/sudoers.d/qbert"
 QBERT_CONFIG="/etc/qbert/services.json"
@@ -18,21 +17,25 @@ if [ "$EUID" -ne 0 ]; then
 	exec sudo bash "$0" "$@"
 fi
 
+# Trova conda nell'ambiente dell'utente
+CONDA_BASE="$(sudo -u "$SERVICE_USER" bash -lc "conda info --base 2>/dev/null")" || true
+if [ -z "$CONDA_BASE" ]; then
+	echo "ERRORE: conda non trovata per l'utente $SERVICE_USER"
+	exit 1
+fi
+CONDA_ENV="$CONDA_BASE/envs/whisper-api"
+
 echo "=== Whisper API - Installazione servizio ==="
 echo "Source: $SOURCE_DIR"
 echo "Install dir: $INSTALL_DIR"
+echo "Utente: $SERVICE_USER"
+echo "Conda env: $CONDA_ENV"
 echo ""
-
-# Verifica conda
-if ! command -v conda &> /dev/null; then
-	echo "ERRORE: conda non trovata"
-	exit 1
-fi
 
 # Crea conda env se non esiste
 if [ ! -d "$CONDA_ENV" ]; then
 	echo "Creazione ambiente conda whisper-api..."
-	sudo -u "$SERVICE_USER" conda create -n whisper-api python=3.11 -y
+	sudo -u "$SERVICE_USER" bash -lc "conda create -n whisper-api python=3.11 -y"
 fi
 
 # Installa dipendenze se mancano
