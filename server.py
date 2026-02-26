@@ -44,7 +44,7 @@ def load_model(name: str = None):
 
 @app.on_event("startup")
 def startup():
-    load_model(DEFAULT_MODEL)
+    pass
 
 
 @app.get("/health")

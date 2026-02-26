@@ -20,23 +20,34 @@ fi
 # Trova conda nell'ambiente dell'utente
 CONDA_BASE="$(sudo -u "$SERVICE_USER" bash -lc "conda info --base 2>/dev/null")" || true
 if [ -z "$CONDA_BASE" ]; then
+	# Cerca conda nei path comuni
+	for candidate in /opt/miniconda3 /opt/anaconda3 "/home/$SERVICE_USER/miniconda3" "/home/$SERVICE_USER/anaconda3"; do
+		if [ -x "$candidate/bin/conda" ]; then
+			CONDA_BASE="$candidate"
+			break
+		fi
+	done
+fi
+if [ -z "$CONDA_BASE" ]; then
 	echo "ERRORE: conda non trovata per l'utente $SERVICE_USER"
 	exit 1
 fi
-CONDA_ENV="$CONDA_BASE/envs/whisper-api"
+CONDA_BIN="$CONDA_BASE/bin/conda"
 
 echo "=== Whisper API - Installazione servizio ==="
 echo "Source: $SOURCE_DIR"
 echo "Install dir: $INSTALL_DIR"
 echo "Utente: $SERVICE_USER"
-echo "Conda env: $CONDA_ENV"
 echo ""
 
-# Crea conda env se non esiste
-if [ ! -d "$CONDA_ENV" ]; then
+# Trova env esistente o creane uno nuovo
+CONDA_ENV="$(sudo -u "$SERVICE_USER" "$CONDA_BIN" info --envs 2>/dev/null | grep "^whisper-api " | awk '{print $NF}')" || true
+if [ -z "$CONDA_ENV" ]; then
 	echo "Creazione ambiente conda whisper-api..."
-	sudo -u "$SERVICE_USER" bash -lc "conda create -n whisper-api python=3.11 -y"
+	sudo -u "$SERVICE_USER" "$CONDA_BIN" create -n whisper-api python=3.11 -y
+	CONDA_ENV="$(sudo -u "$SERVICE_USER" "$CONDA_BIN" info --envs 2>/dev/null | grep "^whisper-api " | awk '{print $NF}')"
 fi
+echo "Conda env: $CONDA_ENV"
 
 # Installa dipendenze se mancano
 if [ ! -f "$CONDA_ENV/bin/uvicorn" ]; then
