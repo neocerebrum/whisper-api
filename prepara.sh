@@ -98,7 +98,7 @@ except BaseException:
 	raise
 PY
 	echo "NOTA: se ${SERVICE_NAME}.service è nuovo in $QBERT_CONFIG, per il restart da QBert"
-	echo "      rilancia QBert/install.sh (rigenera /etc/sudoers.d/qbert) e riavvia QBert."
+	echo "      lancia QBert/sudoers.sh (rigenera /etc/sudoers.d/qbert) e riavvia QBert."
 else
 	echo "NOTA: $QBERT_CONFIG non trovato, QBert non configurato."
 fi
