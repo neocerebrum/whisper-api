@@ -25,6 +25,24 @@ def get_vram_usage():
     return {"allocated_mb": 0, "reserved_mb": 0}
 
 
+def free_cuda_memory() -> None:
+    """Return to the driver everything PyTorch still holds after the model is gone.
+
+    gc + empty_cache() alone are not enough: the first matmul makes PyTorch
+    allocate a cuBLAS workspace (~8 MiB) from its own caching allocator, and
+    that one live block pins the whole segment it sits in (16 MiB here, 644 MiB in qwen-tts-api). No Python
+    object owns it, so it must be cleared explicitly; it is re-created on the
+    next inference.
+    """
+    gc.collect()
+    if not torch.cuda.is_available():
+        return
+    clear_cublas = getattr(torch._C, "_cuda_clearCublasWorkspaces", None)
+    if clear_cublas is not None:
+        clear_cublas()
+    torch.cuda.empty_cache()
+
+
 def load_model(name: str = None):
     global model, model_loaded_at, current_model_name
     name = name or DEFAULT_MODEL
@@ -33,9 +51,7 @@ def load_model(name: str = None):
     if model is not None:
         del model
         model = None
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        free_cuda_memory()
     model = whisper.load_model(name, device="cuda")
     current_model_name = name
     model_loaded_at = time.time()
@@ -116,8 +132,6 @@ def unload():
     model = None
     current_model_name = None
     model_loaded_at = None
-    gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
+    free_cuda_memory()
 
     return {"status": "unloaded", "vram_freed": True, "vram": get_vram_usage()}
